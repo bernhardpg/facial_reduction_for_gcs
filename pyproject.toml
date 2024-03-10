@@ -1,0 +1,19 @@
+[tool.poetry]
+name = "gcs-facial-reduction"
+version = "0.1.0"
+description = ""
+authors = ["Bernhard Paus Graesdal <bernhardpg@gmail.com>"]
+readme = "README.md"
+packages = [{include = "gcs_facial_reduction"}]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+drake = "^1.26.0"
+numpy = "^1.26.4"
+matplotlib = "^3.8.3"
+networkx = "^3.2.1"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
