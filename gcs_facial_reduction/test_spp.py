@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
 import numpy.typing as npt
-from pydrake.math import eq
+from pydrake.math import eq, ge, le
 from pydrake.solvers import MathematicalProgram, Solve
 
 
@@ -51,9 +51,10 @@ G = nx.DiGraph()
 
 # Add edges to the graph
 G.add_edge(0, 1)
+G.add_edge(1, 4)
+G.add_edge(4, 3)
 G.add_edge(0, 2)
 G.add_edge(2, 3)
-G.add_edge(1, 3)
 
 source = 0
 target = 3
@@ -66,6 +67,8 @@ def _construct_b(source: int, target: int, N: int) -> npt.NDArray:
     return b
 
 
+# draw_graph(G)
+
 vertices = list(G.nodes())
 edges = list(G.edges())
 N = len(vertices)
@@ -76,11 +79,15 @@ b = _construct_b(source, target, N)
 prog = MathematicalProgram()
 f = prog.NewContinuousVariables(N, "f")
 
+prog.AddLinearConstraint(ge(f, 0))
+prog.AddLinearConstraint(le(f, 1))
+
 cost = prog.AddLinearCost(np.sum(f))  # equal cost for all edges
 flow_constraint = prog.AddLinearConstraint(eq(A @ f + b, 0))
 
 result = Solve(prog)
 assert result.is_success()
+
 
 f_sols = result.GetSolution(f)
 edge_idxs = np.where(np.isclose(f_sols, 1))[0].tolist()
