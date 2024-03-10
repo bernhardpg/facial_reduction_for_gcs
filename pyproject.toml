@@ -4,7 +4,7 @@ version = "0.1.0"
 description = ""
 authors = ["Bernhard Paus Graesdal <bernhardpg@gmail.com>"]
 readme = "README.md"
-packages = [{include = "gcs_facial_reduction"}]
+packages = [{ include = "gcs_facial_reduction" }]
 
 [tool.poetry.dependencies]
 python = "^3.11"
@@ -21,3 +21,6 @@ pdbpp = "^0.10.3"
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.isort]
+profile = "black" # Make isort and Black agree on sorting
