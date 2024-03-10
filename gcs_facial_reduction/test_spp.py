@@ -46,6 +46,42 @@ def draw_path_in_graph(G: nx.Graph | nx.DiGraph, path: List[Tuple[int, int]]) ->
     plt.show()
 
 
+def _construct_b(source: int, target: int, N: int) -> npt.NDArray:
+    b = np.zeros((N,))
+    b[source] = 1
+    b[target] = -1
+    return b
+
+
+def _formulate_spp_problem(
+    G: nx.DiGraph | nx.Graph, source: int, target: int
+) -> List[Tuple[int, int]]:
+    vertices = list(G.nodes())
+    edges = list(G.edges())
+    N = len(vertices)
+
+    A = nx.incidence_matrix(G, oriented=True).toarray()
+    b = _construct_b(source, target, N)
+
+    prog = MathematicalProgram()
+    f = prog.NewContinuousVariables(N, "f")
+
+    prog.AddLinearConstraint(ge(f, 0))
+    prog.AddLinearConstraint(le(f, 1))
+
+    cost = prog.AddLinearCost(np.sum(f))  # equal cost for all edges
+    flow_constraint = prog.AddLinearConstraint(eq(A @ f + b, 0))
+
+    result = Solve(prog)
+    assert result.is_success()
+
+    f_sols = result.GetSolution(f)
+    edge_idxs = np.where(np.isclose(f_sols, 1))[0].tolist()
+    path = [edges[idx] for idx in edge_idxs]
+
+    return path
+
+
 # Create a graph
 G = nx.DiGraph()
 
@@ -60,37 +96,6 @@ source = 0
 target = 3
 
 
-def _construct_b(source: int, target: int, N: int) -> npt.NDArray:
-    b = np.zeros((N,))
-    b[source] = 1
-    b[target] = -1
-    return b
-
-
 # draw_graph(G)
-
-vertices = list(G.nodes())
-edges = list(G.edges())
-N = len(vertices)
-
-A = nx.incidence_matrix(G, oriented=True).toarray()
-b = _construct_b(source, target, N)
-
-prog = MathematicalProgram()
-f = prog.NewContinuousVariables(N, "f")
-
-prog.AddLinearConstraint(ge(f, 0))
-prog.AddLinearConstraint(le(f, 1))
-
-cost = prog.AddLinearCost(np.sum(f))  # equal cost for all edges
-flow_constraint = prog.AddLinearConstraint(eq(A @ f + b, 0))
-
-result = Solve(prog)
-assert result.is_success()
-
-
-f_sols = result.GetSolution(f)
-edge_idxs = np.where(np.isclose(f_sols, 1))[0].tolist()
-path = [edges[idx] for idx in edge_idxs]
-
+path = _formulate_spp_problem(G, source, target)
 draw_path_in_graph(G, path)
