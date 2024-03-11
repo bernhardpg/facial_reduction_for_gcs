@@ -94,10 +94,20 @@ def e_i(i: int, dims: int) -> npt.NDArray:
 
 
 def _solve_facial_reduction_auxiliary_prob(A: npt.NDArray, b: npt.NDArray):
+
+    # Preprocess A
+    # find linearly independent rows
+    sym_mat = sympy.Matrix(A)
+    inds = list(sym_mat.rref()[1])
+
+    A = A[inds, :]
+    b = b[inds]
+
     m, N = A.shape
     prog = MathematicalProgram()
     y = prog.NewContinuousVariables(m, "y")
 
+    # pick an x in the relative interior of positive orthant
     x_hat = np.ones((N,))
 
     prog.AddLinearConstraint(ge(A.T @ y, 0))
@@ -129,10 +139,6 @@ def facial_reduction_test(G: nx.DiGraph, source: int, target: int) -> None:
     x_zero_idxs = _solve_facial_reduction_auxiliary_prob(A, b)
     breakpoint()
 
-    # find linearly independent rows
-    sym_mat = sympy.Matrix(A)
-    inds = sym_mat.rref()[1]
-
 
 # TODO(bernhardpg): This can be turned into a unit test
 
@@ -144,25 +150,28 @@ def test_problem() -> None:
     assert x_zero_idxs == [0, 3, 4]
 
 
-def test_graph():
+def test_graph_problem():
     # Create a graph
     G = nx.DiGraph()
 
     # Add edges to the graph
     G.add_edge(0, 1)
     G.add_edge(1, 0)
-    G.add_edge(1, 4)
-    G.add_edge(4, 3)
-    G.add_edge(0, 2)
-    G.add_edge(2, 3)
+    G.add_edge(1, 2)
+    # G.add_edge(1, 0)
+    # G.add_edge(1, 4)
+    # G.add_edge(4, 3)
+    # G.add_edge(0, 2)
+    # G.add_edge(2, 3)
 
     source = 0
-    target = 3
+    target = 2
 
     # draw_graph(G)
-    facial_reduction(G, source, target)
+    facial_reduction_test(G, source, target)
     path = _formulate_spp_problem(G, source, target)
     draw_path_in_graph(G, path)
 
 
-test_problem()
+# test_problem()
+test_graph_problem()
