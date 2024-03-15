@@ -50,8 +50,8 @@ def draw_path_in_graph(G: nx.Graph | nx.DiGraph, path: List[Tuple[int, int]]) ->
 
 def _construct_b(source: int, target: int, N: int) -> npt.NDArray:
     b = np.zeros((N,))
-    b[source] = 1
-    b[target] = -1
+    b[source] = -1
+    b[target] = 1
     return b
 
 
@@ -115,9 +115,8 @@ def _solve_facial_reduction_auxiliary_prob(A: npt.NDArray, b: npt.NDArray):
         x_zero_idxs = np.where(~np.isclose(z, 0))[0].tolist()
         return x_zero_idxs
     else:
-        breakpoint()
+        # The problem must be strictly feasible
         raise NotImplementedError("Not yet implemented")
-        breakpoint()
 
 
 def graph_to_standard_form(
@@ -130,6 +129,10 @@ def graph_to_standard_form(
     num_vertices = len(vertices)
 
     # Construct incidence matrix
+    # Ax = b corresponds to incoming = outgoing
+    # Note that this is different from the convention in
+    # "Introduction to Linear Programming" where sum incoming + b = outgoing
+    # (we have Ax = incoming - outgoing = b)
     A = nx.incidence_matrix(G, oriented=True).toarray()
     b = _construct_b(source, target, num_vertices)
 
@@ -179,12 +182,12 @@ def test_spp_simple():
 
     # draw_graph(G)
     A, b = graph_to_standard_form(G, source, target)
-    # path = _formulate_spp_problem(G, source, target)
     x_zero_idxs = _solve_facial_reduction_auxiliary_prob(A, b)
 
-    breakpoint()
+    assert x_zero_idxs == [1, 2]  # we want f_21 = 0 and s_12 = 0 i.e. f_12 = 1
 
-    draw_path_in_graph(G, path)
+    # path = _formulate_spp_problem(G, source, target)
+    # draw_path_in_graph(G, path)
 
 
 # test_example_4_1_1()
