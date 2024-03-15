@@ -140,10 +140,11 @@ def facial_reduction_test(G: nx.DiGraph, source: int, target: int) -> None:
     breakpoint()
 
 
+# Implements Example 4.1.1 from
+# D. Drusvyatskiy and H. Wolkowicz, “The many faces of degeneracy in conic
+# optimization.” arXiv, Jun. 12, 2017. doi: 10.48550/arXiv.1706.03705.
 # TODO(bernhardpg): This can be turned into a unit test
-
-
-def test_problem() -> None:
+def example_4_1_1() -> None:
     A = np.array([[1, 1, 1, 1, 0], [1, -1, -1, 0, 1]])
     b = np.array([1, -1])
     x_zero_idxs = _solve_facial_reduction_auxiliary_prob(A, b)
@@ -173,5 +174,5 @@ def test_graph_problem():
     draw_path_in_graph(G, path)
 
 
-# test_problem()
-test_graph_problem()
+example_4_1_1()
+# test_graph_problem()
