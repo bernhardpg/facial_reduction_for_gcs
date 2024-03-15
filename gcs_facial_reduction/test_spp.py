@@ -170,10 +170,8 @@ def test_example_4_1_1() -> None:
 
 
 def test_spp_simple():
-    # Create a graph
     G = nx.DiGraph()
 
-    # Add edges to the graph
     G.add_edge(0, 1)
     G.add_edge(1, 0)
 
@@ -186,9 +184,32 @@ def test_spp_simple():
 
     assert x_zero_idxs == [1, 2]  # we want f_21 = 0 and s_12 = 0 i.e. f_12 = 1
 
-    # path = _formulate_spp_problem(G, source, target)
-    # draw_path_in_graph(G, path)
 
+def test_spp_flow_split():
+    # Create a graph
+    G = nx.DiGraph()
+
+    # Add edges to the graph
+    G.add_edge(0, 1)
+    G.add_edge(1, 3)
+    G.add_edge(0, 2)
+    G.add_edge(2, 3)
+
+    source = 0
+    target = 3
+
+    # draw_graph(G)
+    A, b = graph_to_standard_form(G, source, target)
+    x_zero_idxs = _solve_facial_reduction_auxiliary_prob(A, b)
+
+    # edges are reordered to [(0,1), (0,2), (1,3), (2,3)] for some reason
+    # we want it to realize that upward flows must be zero
+    assert x_zero_idxs == [2, 3]
+
+
+# path = _formulate_spp_problem(G, source, target)
+# draw_path_in_graph(G, path)
 
 # test_example_4_1_1()
-test_spp_simple()
+# test_spp_simple()
+test_spp_flow_split()
