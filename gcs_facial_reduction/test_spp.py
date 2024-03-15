@@ -95,20 +95,25 @@ def e_i(i: int, dims: int) -> npt.NDArray:
 
 def _solve_facial_reduction_auxiliary_prob(
     A: npt.NDArray, b: npt.NDArray, zero_idxs: Optional[List[int]] = None
-):
+) -> Tuple[bool, List[int]]:
     m, N = A.shape
     prog = MathematicalProgram()
     y = prog.NewContinuousVariables(m, "y")
     s = prog.NewContinuousVariables(N, "s")
 
+    if zero_idxs is None:
+        zero_idxs = []
+
     # pick an x in the relative interior of positive orthant
     x_hat = np.ones((N,))
 
-    if zero_idxs:
-        for idx in zero_idxs:
-            x_hat[idx] = 0
+    for idx in zero_idxs:
+        x_hat[idx] = 0
 
-    prog.AddLinearConstraint(ge(s, 0))
+    non_zero_idxs = [i for i in range(N) if i not in zero_idxs]
+    for idx in non_zero_idxs:
+        prog.AddLinearConstraint(s[idx] >= 0)
+
     prog.AddLinearConstraint(eq(s, A.T @ y))
     prog.AddLinearConstraint(b.T @ y == 0)
     prog.AddLinearConstraint(x_hat.T @ s == 1)
@@ -120,10 +125,14 @@ def _solve_facial_reduction_auxiliary_prob(
         z = A.T @ y_sol
         # x must be zero where z is nonzero
         x_zero_idxs = np.where(~np.isclose(z, 0))[0].tolist()
-        return x_zero_idxs
+
+        if zero_idxs is not None:
+            return False, list(set(x_zero_idxs + zero_idxs))
+        else:
+            return x_zero_idxs
     else:
         # The problem must be strictly feasible
-        raise NotImplementedError("Not yet implemented")
+        return True, zero_idxs
 
 
 def graph_to_standard_form(
@@ -207,16 +216,20 @@ def test_spp_flow_split():
 
     # draw_graph(G)
     A, b = graph_to_standard_form(G, source, target)
-    x_zero_idxs = _solve_facial_reduction_auxiliary_prob(A, b)
+    x_zero_idxs = []
+    strictly_feasible = False
+    while not strictly_feasible:
+        strictly_feasible, x_zero_idxs = _solve_facial_reduction_auxiliary_prob(
+            A, b, x_zero_idxs
+        )
 
-    # edges are reordered to [(0,1), (0,2), (1,3), (2,3)] for some reason
-    # we want it to realize that upward flows must be zero
-    assert x_zero_idxs == [2, 3]
+    breakpoint()
 
 
 # path = _formulate_spp_problem(G, source, target)
 # draw_path_in_graph(G, path)
 
+
 # test_example_4_1_1()
-test_spp_simple()
-# test_spp_flow_split()
+# test_spp_simple()
+test_spp_flow_split()
