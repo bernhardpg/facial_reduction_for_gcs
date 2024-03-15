@@ -1,4 +1,4 @@
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 
 import matplotlib.pyplot as plt
 import networkx as nx
@@ -93,18 +93,25 @@ def e_i(i: int, dims: int) -> npt.NDArray:
     return e
 
 
-def _solve_facial_reduction_auxiliary_prob(A: npt.NDArray, b: npt.NDArray):
-
+def _solve_facial_reduction_auxiliary_prob(
+    A: npt.NDArray, b: npt.NDArray, zero_idxs: Optional[List[int]] = None
+):
     m, N = A.shape
     prog = MathematicalProgram()
     y = prog.NewContinuousVariables(m, "y")
+    s = prog.NewContinuousVariables(N, "s")
 
     # pick an x in the relative interior of positive orthant
     x_hat = np.ones((N,))
 
-    prog.AddLinearConstraint(ge(A.T @ y, 0))
+    if zero_idxs:
+        for idx in zero_idxs:
+            x_hat[idx] = 0
+
+    prog.AddLinearConstraint(ge(s, 0))
+    prog.AddLinearConstraint(eq(s, A.T @ y))
     prog.AddLinearConstraint(b.T @ y == 0)
-    prog.AddLinearConstraint(x_hat.T @ A.T @ y == 1)
+    prog.AddLinearConstraint(x_hat.T @ s == 1)
 
     result = Solve(prog)
 
@@ -211,5 +218,5 @@ def test_spp_flow_split():
 # draw_path_in_graph(G, path)
 
 # test_example_4_1_1()
-# test_spp_simple()
-test_spp_flow_split()
+test_spp_simple()
+# test_spp_flow_split()
