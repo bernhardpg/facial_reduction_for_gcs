@@ -95,14 +95,6 @@ def e_i(i: int, dims: int) -> npt.NDArray:
 
 def _solve_facial_reduction_auxiliary_prob(A: npt.NDArray, b: npt.NDArray):
 
-    # Preprocess A
-    # find linearly independent rows
-    sym_mat = sympy.Matrix(A)
-    inds = list(sym_mat.rref()[1])
-
-    A = A[inds, :]
-    b = b[inds]
-
     m, N = A.shape
     prog = MathematicalProgram()
     y = prog.NewContinuousVariables(m, "y")
@@ -128,51 +120,72 @@ def _solve_facial_reduction_auxiliary_prob(A: npt.NDArray, b: npt.NDArray):
         breakpoint()
 
 
-def facial_reduction_test(G: nx.DiGraph, source: int, target: int) -> None:
+def graph_to_standard_form(
+    G: nx.DiGraph, source: int, target: int
+) -> Tuple[npt.NDArray, npt.NDArray]:
     vertices = list(G.nodes())
     edges = list(G.edges())
-    N = len(vertices)
 
+    num_edges = len(edges)
+    num_vertices = len(vertices)
+
+    # Construct incidence matrix
     A = nx.incidence_matrix(G, oriented=True).toarray()
-    b = _construct_b(source, target, N)
+    b = _construct_b(source, target, num_vertices)
 
-    x_zero_idxs = _solve_facial_reduction_auxiliary_prob(A, b)
-    breakpoint()
+    # Add slack variables for each flow fᵤᵥ
+    # to encode 0 ≤ fᵤᵥ ≤ 1 in standard form
+
+    # Pad A with extra columns for all the slack variables we need to add
+    A = np.hstack((A, np.zeros((num_vertices, num_edges))))
+    for e_idx in range(num_edges):
+        row = np.zeros((1, num_edges * 2))
+        row[0, e_idx] = 1
+        row[0, num_edges + e_idx] = 1
+        A = np.vstack((A, row))
+        b = np.concatenate((b, [1]))
+
+    # Remove linearly independent rows in A
+    sym_mat = sympy.Matrix(A.T)
+    inds = list(sym_mat.rref()[1])
+
+    A = A[inds, :]
+    b = b[inds]
+
+    return A, b
 
 
 # Implements Example 4.1.1 from
 # D. Drusvyatskiy and H. Wolkowicz, “The many faces of degeneracy in conic
 # optimization.” arXiv, Jun. 12, 2017. doi: 10.48550/arXiv.1706.03705.
 # TODO(bernhardpg): This can be turned into a unit test
-def example_4_1_1() -> None:
+def test_example_4_1_1() -> None:
     A = np.array([[1, 1, 1, 1, 0], [1, -1, -1, 0, 1]])
     b = np.array([1, -1])
     x_zero_idxs = _solve_facial_reduction_auxiliary_prob(A, b)
     assert x_zero_idxs == [0, 3, 4]
 
 
-def test_graph_problem():
+def test_spp_simple():
     # Create a graph
     G = nx.DiGraph()
 
     # Add edges to the graph
     G.add_edge(0, 1)
     G.add_edge(1, 0)
-    G.add_edge(1, 2)
-    # G.add_edge(1, 0)
-    # G.add_edge(1, 4)
-    # G.add_edge(4, 3)
-    # G.add_edge(0, 2)
-    # G.add_edge(2, 3)
 
     source = 0
-    target = 2
+    target = 1
 
     # draw_graph(G)
-    facial_reduction_test(G, source, target)
-    path = _formulate_spp_problem(G, source, target)
+    A, b = graph_to_standard_form(G, source, target)
+    # path = _formulate_spp_problem(G, source, target)
+    x_zero_idxs = _solve_facial_reduction_auxiliary_prob(A, b)
+
+    breakpoint()
+
     draw_path_in_graph(G, path)
 
 
-example_4_1_1()
-# test_graph_problem()
+# test_example_4_1_1()
+test_spp_simple()
