@@ -135,7 +135,7 @@ def _solve_facial_reduction_auxiliary_prob(
         return True, zero_idxs
 
 
-def graph_to_standard_form(
+def get_graph_description(
     G: nx.DiGraph, source: int, target: int
 ) -> Tuple[npt.NDArray, npt.NDArray]:
     vertices = list(G.nodes())
@@ -152,6 +152,13 @@ def graph_to_standard_form(
     A = nx.incidence_matrix(G, oriented=True).toarray()
     b = _construct_b(source, target, num_vertices)
 
+    return A, b
+
+
+def graph_to_standard_form(
+    A: npt.NDArray, b: npt.NDArray
+) -> Tuple[npt.NDArray, npt.NDArray]:
+    num_vertices, num_edges = A.shape
     # Add slack variables for each flow fᵤᵥ
     # to encode 0 ≤ fᵤᵥ ≤ 1 in standard form
 
@@ -195,17 +202,21 @@ def test_spp_simple():
     target = 1
 
     # draw_graph(G)
-    A, b = graph_to_standard_form(G, source, target)
+    A, b = get_graph_description(G, source, target)
+    A, b = graph_to_standard_form(A, b)
     x_zero_idxs = _solve_facial_reduction_auxiliary_prob(A, b)
 
     assert x_zero_idxs == [1, 2]  # we want f_21 = 0 and s_12 = 0 i.e. f_12 = 1
 
 
 def test_spp_flow_split():
-    # Create a graph
     G = nx.DiGraph()
 
-    # Add edges to the graph
+    G.add_node(0)
+    G.add_node(1)
+    G.add_node(2)
+    G.add_node(3)
+
     G.add_edge(0, 1)
     G.add_edge(1, 3)
     G.add_edge(0, 2)
@@ -215,7 +226,8 @@ def test_spp_flow_split():
     target = 3
 
     # draw_graph(G)
-    A, b = graph_to_standard_form(G, source, target)
+    A, b = get_graph_description(G, source, target)
+    A, b = graph_to_standard_form(A, b)
     x_zero_idxs = []
     strictly_feasible = False
     while not strictly_feasible:
@@ -223,13 +235,141 @@ def test_spp_flow_split():
             A, b, x_zero_idxs
         )
 
-    breakpoint()
+    # No facial reduction should be possible
+    assert len(x_zero_idxs) == 0
+
+
+def test_get_graph_description_simple():
+    G = nx.DiGraph()
+
+    G.add_node(0)
+    G.add_node(1)
+
+    G.add_edge(0, 1)
+    G.add_edge(1, 0)
+
+    A, b = get_graph_description(G, source=0, target=1)
+    assert A.shape == (2, 2)
+    assert b.shape == (2,)
+
+    assert b[0] == -1
+    assert b[1] == 1
+
+    f_feasible = np.array([1, 0])
+
+    assert np.all(A @ f_feasible == b)
+
+    f_infeasible = np.array([0, 1])
+    assert not np.all(A @ f_infeasible == b)
+
+
+def test_get_graph_description_split():
+    G = nx.DiGraph()
+
+    # TODO(bernhardpg): NetworkX changes the
+    # ordering of the nodes unless you add them like
+    # this. This messes with my code!
+    G.add_node(0)
+    G.add_node(1)
+    G.add_node(2)
+    G.add_node(3)
+
+    G.add_edge(0, 1)
+    G.add_edge(0, 2)
+    G.add_edge(1, 3)
+    G.add_edge(2, 3)
+
+    source = 0
+    target = 3
+
+    A, b = get_graph_description(G, source=source, target=target)
+    # edges: (0, 1), (0, 2), (1, 3), (2, 3)
+    # (after NetworkX reorders them)
+    f_feasible_1 = np.array([1, 0, 1, 0])
+    assert np.all(A @ f_feasible_1 == b)
+
+    f_feasible_2 = np.array([0, 1, 0, 1])
+    assert np.all(A @ f_feasible_2 == b)
+
+    f_infeasible_1 = np.array([1, 0, 0, 1])
+    assert not np.all(A @ f_infeasible_1 == b)
+
+    f_infeasible_2 = np.array([0, 1, 1, 0])
+    assert not np.all(A @ f_infeasible_2 == b)
+
+
+def test_graph_to_standard_form_simple():
+    G = nx.DiGraph()
+
+    G.add_node(0)
+    G.add_node(1)
+
+    G.add_edge(0, 1)
+    G.add_edge(1, 0)
+
+    A, b = get_graph_description(G, source=0, target=1)
+    N, m = A.shape
+
+    A, b = graph_to_standard_form(A, b)
+
+    assert A.shape == (2 * N - 1, 2 * m)
+    assert b.shape == (2 * N - 1,)
+
+    f_feasible = np.array([1, 0, 0, 1])
+
+    assert np.all(A @ f_feasible == b)
+
+    f_infeasible = np.array([0, 1, 1, 0])
+    assert not np.all(A @ f_infeasible == b)
+
+
+def test_graph_to_standard_form_split():
+    G = nx.DiGraph()
+
+    G.add_node(0)
+    G.add_node(1)
+    G.add_node(2)
+    G.add_node(3)
+
+    G.add_edge(0, 1)
+    G.add_edge(1, 3)
+    G.add_edge(0, 2)
+    G.add_edge(2, 3)
+
+    source = 0
+    target = 3
+
+    A, b = get_graph_description(G, source=source, target=target)
+    # edges: (0, 1), (0, 2), (1, 3), (2, 3)
+    # (after NetworkX reorders them)
+
+    A, b = graph_to_standard_form(A, b)
+
+    f_feasible_1 = np.array([1, 0, 1, 0, 0, 1, 0, 1])
+    assert np.all(A @ f_feasible_1 == b)
+
+    f_feasible_2 = np.array([0, 1, 0, 1, 1, 0, 1, 0])
+    assert np.all(A @ f_feasible_2 == b)
+
+    f_infeasible_1 = np.array([0, 1, 1, 0, 1, 0, 0, 1])
+    assert not np.all(A @ f_infeasible_1 == b)
+
+    f_infeasible_2 = np.array([1, 0, 0, 1, 0, 1, 1, 0])
+    assert not np.all(A @ f_infeasible_2 == b)
+
+    f_infeasible_3 = np.array([1, 1, 1, 1, 0, 0, 0, 0])
+    assert not np.all(A @ f_infeasible_3 == b)
+
+    f_infeasible_4 = np.array([0, 0, 0, 0, 1, 1, 1, 1])
+    assert not np.all(A @ f_infeasible_4 == b)
 
 
 # path = _formulate_spp_problem(G, source, target)
 # draw_path_in_graph(G, path)
-
-
 # test_example_4_1_1()
 # test_spp_simple()
+# test_get_graph_description_simple()
+# test_get_graph_description_split()
+# test_graph_to_standard_form_simple()
+# test_graph_to_standard_form_split()
 test_spp_flow_split()
