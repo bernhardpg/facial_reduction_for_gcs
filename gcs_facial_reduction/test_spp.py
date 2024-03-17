@@ -129,7 +129,7 @@ def _solve_facial_reduction_auxiliary_prob(
         if zero_idxs is not None:
             return False, list(set(x_zero_idxs + zero_idxs))
         else:
-            return x_zero_idxs
+            return False, x_zero_idxs
     else:
         # The problem must be strictly feasible
         return True, zero_idxs
@@ -192,7 +192,7 @@ def test_example_4_1_1() -> None:
     assert x_zero_idxs == [0, 3, 4]
 
 
-def test_spp_simple():
+def test_spp_simple_1():
     G = nx.DiGraph()
 
     G.add_edge(0, 1)
@@ -204,9 +204,41 @@ def test_spp_simple():
     # draw_graph(G)
     A, b = get_graph_description(G, source, target)
     A, b = graph_to_standard_form(A, b)
-    x_zero_idxs = _solve_facial_reduction_auxiliary_prob(A, b)
+    _, x_zero_idxs = _solve_facial_reduction_auxiliary_prob(A, b)
 
     assert x_zero_idxs == [1, 2]  # we want f_21 = 0 and s_12 = 0 i.e. f_12 = 1
+
+
+def test_spp_simple_2():
+    G = nx.DiGraph()
+
+    G.add_node(0)
+    G.add_node(1)
+    G.add_node(2)
+
+    G.add_edge(0, 1)
+    G.add_edge(1, 0)
+    G.add_edge(1, 2)
+    G.add_edge(2, 1)
+
+    source = 0
+    target = 2
+
+    # draw_graph(G)
+    A, b = get_graph_description(G, source, target)
+    A, b = graph_to_standard_form(A, b)
+    strictly_feasible, x_zero_idxs = _solve_facial_reduction_auxiliary_prob(A, b)
+    strictly_feasible, x_zero_idxs = _solve_facial_reduction_auxiliary_prob(
+        A, b, x_zero_idxs
+    )
+    strictly_feasible, x_zero_idxs = _solve_facial_reduction_auxiliary_prob(
+        A, b, x_zero_idxs
+    )
+
+    assert strictly_feasible
+
+    # edges: (0, 1), (1, 0), (1, 2), (2, 1)
+    assert x_zero_idxs == [1, 3, 4, 6]
 
 
 def test_spp_flow_split():
@@ -237,6 +269,50 @@ def test_spp_flow_split():
 
     # No facial reduction should be possible
     assert len(x_zero_idxs) == 0
+
+
+def test_spp_flow_split_bidirectional():
+    G = nx.DiGraph()
+
+    G.add_node(0)
+    G.add_node(1)
+    G.add_node(2)
+    G.add_node(3)
+
+    G.add_edge(0, 1)
+    G.add_edge(1, 3)
+    G.add_edge(0, 2)
+    G.add_edge(2, 3)
+
+    G.add_edge(1, 0)
+    G.add_edge(3, 1)
+    G.add_edge(2, 0)
+    G.add_edge(3, 2)
+
+    source = 0
+    target = 3
+
+    # draw_graph(G)
+    A, b = get_graph_description(G, source, target)
+    A, b = graph_to_standard_form(A, b)
+    x_zero_idxs = []
+    strictly_feasible = False
+    while not strictly_feasible:
+        strictly_feasible, x_zero_idxs = _solve_facial_reduction_auxiliary_prob(
+            A, b, x_zero_idxs
+        )
+
+    # (0, 1), (0, 2), (1, 3), (1, 0), (2, 3), (2, 0), (3, 1), (3, 2)
+    f_feasible = np.array([1, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 1, 1, 1, 1, 1])
+    assert np.all(A @ f_feasible == b)
+
+    # It should not be possible to push more than one flow through each edge
+    f_infeasible = np.array([2, 0, 1, 1, 0, 0, 0, 0, 0, 1, 0, 1, 1, 1, 1, 1])
+    assert not np.all(A @ f_infeasible == b)
+
+    breakpoint()
+    # TODO(bernhardpg): Should it not be possible to remove more edges here??
+    assert len(x_zero_idxs) > 0
 
 
 def test_get_graph_description_simple():
@@ -368,8 +444,10 @@ def test_graph_to_standard_form_split():
 # draw_path_in_graph(G, path)
 # test_example_4_1_1()
 # test_spp_simple()
+# test_spp_simple_2()
 # test_get_graph_description_simple()
 # test_get_graph_description_split()
 # test_graph_to_standard_form_simple()
 # test_graph_to_standard_form_split()
-test_spp_flow_split()
+# test_spp_flow_split()
+test_spp_flow_split_bidirectional()
