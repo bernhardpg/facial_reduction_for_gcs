@@ -55,7 +55,7 @@ def _construct_b(source: int, target: int, N: int) -> npt.NDArray:
     return b
 
 
-def _formulate_spp_problem(
+def _formulate_fr_problem(
     G: nx.DiGraph | nx.Graph, source: int, target: int
 ) -> List[Tuple[int, int]]:
     vertices = list(G.nodes())
@@ -192,7 +192,7 @@ def test_example_4_1_1() -> None:
     assert x_zero_idxs == [0, 3, 4]
 
 
-def test_spp_simple_1():
+def test_fr_simple_1():
     G = nx.DiGraph()
 
     G.add_edge(0, 1)
@@ -209,7 +209,7 @@ def test_spp_simple_1():
     assert x_zero_idxs == [1, 2]  # we want f_21 = 0 and s_12 = 0 i.e. f_12 = 1
 
 
-def test_spp_simple_2():
+def test_fr_simple_2():
     G = nx.DiGraph()
 
     G.add_node(0)
@@ -241,7 +241,7 @@ def test_spp_simple_2():
     assert x_zero_idxs == [1, 3, 4, 6]
 
 
-def test_spp_flow_split():
+def test_fr_flow_split():
     G = nx.DiGraph()
 
     G.add_node(0)
@@ -271,7 +271,7 @@ def test_spp_flow_split():
     assert len(x_zero_idxs) == 0
 
 
-def test_spp_flow_split_bidirectional():
+def test_fr_flow_split_bidirectional():
     G = nx.DiGraph()
 
     G.add_node(0)
@@ -440,14 +440,14 @@ def test_graph_to_standard_form_split():
     assert not np.all(A @ f_infeasible_4 == b)
 
 
-# path = _formulate_spp_problem(G, source, target)
+# path = _formulate_fr_problem(G, source, target)
 # draw_path_in_graph(G, path)
 # test_example_4_1_1()
-# test_spp_simple()
-# test_spp_simple_2()
+# test_fr_simple()
+# test_fr_simple_2()
 # test_get_graph_description_simple()
 # test_get_graph_description_split()
 # test_graph_to_standard_form_simple()
 # test_graph_to_standard_form_split()
-# test_spp_flow_split()
-test_spp_flow_split_bidirectional()
+# test_fr_flow_split()
+test_fr_flow_split_bidirectional()
