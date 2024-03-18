@@ -1,10 +1,11 @@
-from typing import List, Optional, Tuple
+from typing import List, Literal, Optional, Tuple
 
 import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
 import numpy.typing as npt
 import sympy
+from matplotlib.axes import mpatches
 from networkx.classes import DiGraph
 from pydrake.math import eq, ge, le
 from pydrake.solvers import MathematicalProgram, Solve
@@ -32,12 +33,20 @@ def simplify_graph_from_fr_result(zero_idxs: List[int], G: nx.Graph) -> nx.Graph
 
 
 def draw_graph(
-    G: nx.Graph | nx.DiGraph, source: Optional[int] = None, target: Optional[int] = None
+    G: nx.Graph | nx.DiGraph,
+    source: Optional[int] = None,
+    target: Optional[int] = None,
+    pos: Literal["random", "deterministic"] = "random",
 ) -> None:
+    # Generate a fixed layout if not provided
+    if pos == "deterministic":
+        pos = nx.circular_layout(G)  # Example of using a circular layout
+        # Alternatively, use any deterministic layout function or a custom layout dictionary
+        # pos = {node: (node, len(G.nodes) - node) for node in G.nodes}  # Example of a custom layout
+    else:  # random
+        pos = nx.spring_layout(G)  # Calculate the layout for the nodes
 
-    # Draw the graph
-    pos = nx.spring_layout(G)  # Calculate the layout for the nodes
-    # Draw all nodes initially with a default color
+    # Draw the graph using the specified/fixed positions
     nx.draw_networkx_nodes(
         G,
         pos,
@@ -46,30 +55,25 @@ def draw_graph(
         node_color="lightblue",
     )
 
-    # Highlight the source node if specified
     if source is not None and source in G.nodes:
         nx.draw_networkx_nodes(
             G,
             pos,
             nodelist=[source],
             node_size=500,
-            node_color="green",  # Highlight color for source
+            node_color="green",
         )
 
-    # Highlight the target node if specified
     if target is not None and target in G.nodes:
         nx.draw_networkx_nodes(
             G,
             pos,
             nodelist=[target],
             node_size=500,
-            node_color="red",  # Highlight color for target
+            node_color="red",
         )
 
-    # Draw edges
     nx.draw_networkx_edges(G, pos)
-
-    # Draw node labels
     nx.draw_networkx_labels(
         G,
         pos,
@@ -77,11 +81,14 @@ def draw_graph(
         font_weight="bold",
     )
 
-    # Edge labels
     edge_labels = nx.get_edge_attributes(G, "label")
     nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels)
 
-    # Show the plot
+    # Create a legend for the source and target nodes
+    source_patch = mpatches.Patch(color="green", label="source")
+    target_patch = mpatches.Patch(color="red", label="target")
+    plt.legend(handles=[source_patch, target_patch])
+
     plt.axis("off")
     plt.show()
 
@@ -294,14 +301,18 @@ def run_facial_reduction(A: npt.NDArray, b: npt.NDArray) -> Tuple[bool, List[int
     return strictly_feasible, x_zero_idxs
 
 
-# path = _formulate_fr_problem(G, source, target)
-# draw_path_in_graph(G, path)
-# test_example_4_1_1()
-# test_fr_simple()
-# test_fr_simple_2()
-# test_get_graph_description_simple()
-# test_get_graph_description_split()
-# test_graph_to_standard_form_simple()
-# test_graph_to_standard_form_split()
-# test_fr_flow_split()
-# test_fr_flow_split_bidirectional()
+def run_fr_on_graph_and_visualize(
+    G: nx.DiGraph,
+    source: int,
+    target: int,
+    pos: Literal["random", "deterministic"] = "deterministic",
+) -> None:
+    draw_graph(G, source, target, pos)
+
+    A, b = get_graph_description(G, source, target)
+    A, b = graph_to_standard_form_with_flow_limits(A, b, G, source, target)
+    strictly_feasible, x_zero_idxs = run_facial_reduction(A, b)
+    assert strictly_feasible
+
+    new_G = simplify_graph_from_fr_result(x_zero_idxs, G)
+    draw_graph(new_G, source, target, pos)
