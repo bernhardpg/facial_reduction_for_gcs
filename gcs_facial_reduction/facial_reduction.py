@@ -10,18 +10,76 @@ from pydrake.math import eq, ge, le
 from pydrake.solvers import MathematicalProgram, Solve
 
 
-def draw_graph(G: nx.Graph | nx.DiGraph) -> None:
+def simplify_graph_from_fr_result(zero_idxs: List[int], G: nx.Graph) -> nx.Graph:
+    num_nodes = len(G.nodes())
+    num_edges = len(G.edges())
+
+    G_new = nx.DiGraph()
+
+    for node in G.nodes():
+        G_new.add_node(node)
+
+    for idx, (u, v) in enumerate(G.edges()):
+        if idx not in zero_idxs:
+
+            slack_var_tight = idx + num_edges in zero_idxs
+            if slack_var_tight:
+                G_new.add_edge(u, v, label="=1")
+            else:
+                G_new.add_edge(u, v)
+
+    return G_new
+
+
+def draw_graph(
+    G: nx.Graph | nx.DiGraph, source: Optional[int] = None, target: Optional[int] = None
+) -> None:
+
     # Draw the graph
     pos = nx.spring_layout(G)  # Calculate the layout for the nodes
-    nx.draw(
+    # Draw all nodes initially with a default color
+    nx.draw_networkx_nodes(
         G,
         pos,
-        with_labels=True,
+        nodelist=G.nodes(),
         node_size=500,
         node_color="lightblue",
+    )
+
+    # Highlight the source node if specified
+    if source is not None and source in G.nodes:
+        nx.draw_networkx_nodes(
+            G,
+            pos,
+            nodelist=[source],
+            node_size=500,
+            node_color="green",  # Highlight color for source
+        )
+
+    # Highlight the target node if specified
+    if target is not None and target in G.nodes:
+        nx.draw_networkx_nodes(
+            G,
+            pos,
+            nodelist=[target],
+            node_size=500,
+            node_color="red",  # Highlight color for target
+        )
+
+    # Draw edges
+    nx.draw_networkx_edges(G, pos)
+
+    # Draw node labels
+    nx.draw_networkx_labels(
+        G,
+        pos,
         font_size=16,
         font_weight="bold",
     )
+
+    # Edge labels
+    edge_labels = nx.get_edge_attributes(G, "label")
+    nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels)
 
     # Show the plot
     plt.axis("off")
@@ -179,6 +237,17 @@ def graph_to_standard_form(
     b = b[inds]
 
     return A, b
+
+
+def run_facial_reduction(A: npt.NDArray, b: npt.NDArray) -> Tuple[bool, List[int]]:
+    x_zero_idxs = []
+    strictly_feasible = False
+    while not strictly_feasible:
+        strictly_feasible, x_zero_idxs = solve_facial_reduction_auxiliary_prob(
+            A, b, x_zero_idxs
+        )
+
+    return strictly_feasible, x_zero_idxs
 
 
 # path = _formulate_fr_problem(G, source, target)

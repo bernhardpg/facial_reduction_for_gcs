@@ -9,8 +9,11 @@ from pydrake.math import eq, ge, le
 from pydrake.solvers import MathematicalProgram, Solve
 
 from gcs_facial_reduction.facial_reduction import (
+    draw_graph,
     get_graph_description,
     graph_to_standard_form,
+    run_facial_reduction,
+    simplify_graph_from_fr_result,
     solve_facial_reduction_auxiliary_prob,
 )
 
@@ -64,7 +67,6 @@ def test_fr_simple_2():
     source = 0
     target = 2
 
-    # draw_graph(G)
     A, b = get_graph_description(G, source, target)
     A, b = graph_to_standard_form(A, b)
     strictly_feasible, x_zero_idxs = solve_facial_reduction_auxiliary_prob(A, b)
@@ -79,6 +81,49 @@ def test_fr_simple_2():
 
     # edges: (0, 1), (1, 0), (1, 2), (2, 1)
     assert x_zero_idxs == [1, 3, 4, 6]
+
+    # new_G = simplify_graph_from_fr_result(x_zero_idxs, G)
+    # draw_graph(new_G)
+
+
+def test_fr_simple_3():
+    G = nx.DiGraph()
+
+    G.add_node(0)
+    G.add_node(1)
+    G.add_node(2)
+    G.add_node(3)
+    G.add_node(4)
+    G.add_node(5)
+
+    G.add_edge(0, 1)
+    G.add_edge(1, 0)
+    G.add_edge(1, 2)
+    G.add_edge(2, 1)
+    G.add_edge(2, 3)
+    G.add_edge(3, 2)
+    G.add_edge(2, 4)
+    G.add_edge(4, 3)
+    # G.add_edge(3, 5)
+    # G.add_edge(4, 5)
+    # G.add_edge(5, 4)
+    # G.add_edge(5, 3)
+
+    source = 0
+    target = 3
+
+    A, b = get_graph_description(G, source, target)
+    A, b = graph_to_standard_form(A, b)
+    strictly_feasible, x_zero_idxs = run_facial_reduction(A, b)
+
+    assert strictly_feasible
+
+    # edges: (0, 1), (1, 0), (1, 2), (2, 1)
+    # assert x_zero_idxs == [1, 3, 4, 6]
+
+    # draw_graph(G, source, target)
+    new_G = simplify_graph_from_fr_result(x_zero_idxs, G)
+    draw_graph(new_G, source, target)
 
 
 def test_fr_flow_split():
