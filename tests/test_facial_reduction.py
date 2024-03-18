@@ -12,6 +12,7 @@ from gcs_facial_reduction.facial_reduction import (
     draw_graph,
     get_graph_description,
     graph_to_standard_form,
+    graph_to_standard_form_with_flow_limits,
     run_facial_reduction,
     simplify_graph_from_fr_result,
     solve_facial_reduction_auxiliary_prob,
@@ -121,7 +122,7 @@ def test_fr_simple_3():
     # edges: (0, 1), (1, 0), (1, 2), (2, 1)
     # assert x_zero_idxs == [1, 3, 4, 6]
 
-    # draw_graph(G, source, target)
+    draw_graph(G, source, target)
     new_G = simplify_graph_from_fr_result(x_zero_idxs, G)
     draw_graph(new_G, source, target)
 
@@ -156,7 +157,6 @@ def test_fr_flow_split():
     assert len(x_zero_idxs) == 0
 
 
-@pytest.mark.skip
 def test_fr_flow_split_bidirectional():
     G = nx.DiGraph()
 
@@ -178,15 +178,14 @@ def test_fr_flow_split_bidirectional():
     source = 0
     target = 3
 
-    # draw_graph(G)
+    # draw_graph(G, source, target)
     A, b = get_graph_description(G, source, target)
-    A, b = graph_to_standard_form(A, b)
-    x_zero_idxs = []
-    strictly_feasible = False
-    while not strictly_feasible:
-        strictly_feasible, x_zero_idxs = solve_facial_reduction_auxiliary_prob(
-            A, b, x_zero_idxs
-        )
+    A, b = graph_to_standard_form_with_flow_limits(A, b, G, source, target)
+    strictly_feasible, zero_idxs = run_facial_reduction(A, b)
+    assert strictly_feasible
+
+    G_new = simplify_graph_from_fr_result(zero_idxs, G)
+    draw_graph(G_new, source, target)
 
     # (0, 1), (0, 2), (1, 3), (1, 0), (2, 3), (2, 0), (3, 1), (3, 2)
     f_feasible = np.array([1, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 1, 1, 1, 1, 1])
@@ -196,9 +195,62 @@ def test_fr_flow_split_bidirectional():
     f_infeasible = np.array([2, 0, 1, 1, 0, 0, 0, 0, 0, 1, 0, 1, 1, 1, 1, 1])
     assert not np.all(A @ f_infeasible == b)
 
-    breakpoint()
     # TODO(bernhardpg): Should it not be possible to remove more edges here??
-    assert len(x_zero_idxs) > 0
+    assert len(zero_idxs) > 0
+
+
+def test_fr_flow_split_minimal_example_with_revisits():
+    G = nx.DiGraph()
+
+    G.add_node(0)
+    G.add_node(1)
+    G.add_node(2)
+    # G.add_node(3)
+
+    G.add_edge(0, 1)
+    # G.add_edge(1, 3)
+    G.add_edge(0, 2)
+    # G.add_edge(2, 3)
+
+    G.add_edge(1, 0)
+    # G.add_edge(3, 1)
+    # G.add_edge(2, 0)
+    # G.add_edge(3, 2)
+
+    source = 0
+    target = 2
+
+    # draw_graph(G, source, target)
+    A, b = get_graph_description(G, source, target)
+    A, b = graph_to_standard_form_with_flow_limits(A, b, G, source, target)
+    strictly_feasible, zero_idxs = solve_facial_reduction_auxiliary_prob(A, b)
+    strictly_feasible, zero_idxs = solve_facial_reduction_auxiliary_prob(
+        A, b, zero_idxs
+    )
+    strictly_feasible, zero_idxs = solve_facial_reduction_auxiliary_prob(
+        A, b, zero_idxs
+    )
+    strictly_feasible, zero_idxs = solve_facial_reduction_auxiliary_prob(
+        A, b, zero_idxs
+    )
+    # strictly_feasible, zero_idxs = run_facial_reduction(A, b)
+
+    # assert strictly_feasible
+    print(zero_idxs)
+
+    G_new = simplify_graph_from_fr_result(zero_idxs, G)
+    draw_graph(G_new, source, target)
+
+    # (0, 1), (0, 2), (1, 3), (1, 0), (2, 3), (2, 0), (3, 1), (3, 2)
+    f_feasible = np.array([1, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 1, 1, 1, 1, 1])
+    assert np.all(A @ f_feasible == b)
+
+    # It should not be possible to push more than one flow through each edge
+    f_infeasible = np.array([2, 0, 1, 1, 0, 0, 0, 0, 0, 1, 0, 1, 1, 1, 1, 1])
+    assert not np.all(A @ f_infeasible == b)
+
+    # TODO(bernhardpg): Should it not be possible to remove more edges here??
+    assert len(zero_idxs) > 0
 
 
 def test_get_graph_description_simple():

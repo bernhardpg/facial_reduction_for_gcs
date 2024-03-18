@@ -196,11 +196,8 @@ def solve_facial_reduction_auxiliary_prob(
 def get_graph_description(
     G: nx.DiGraph, source: int, target: int
 ) -> Tuple[npt.NDArray, npt.NDArray]:
-    vertices = list(G.nodes())
-    edges = list(G.edges())
-
-    num_edges = len(edges)
-    num_vertices = len(vertices)
+    num_edges = len(list(G.edges()))
+    num_vertices = len(list(G.nodes()))
 
     # Construct incidence matrix
     # Ax = b corresponds to incoming = outgoing
@@ -209,6 +206,53 @@ def get_graph_description(
     # (we have Ax = incoming - outgoing = b)
     A = nx.incidence_matrix(G, oriented=True).toarray()
     b = _construct_b(source, target, num_vertices)
+
+    return A, b
+
+
+# TODO(bernhardpg): Merge this with the function below
+def graph_to_standard_form_with_flow_limits(
+    A: npt.NDArray, b: npt.NDArray, G: nx.DiGraph, source: int, target: int
+) -> Tuple[npt.NDArray, npt.NDArray]:
+    num_vertices, num_edges = A.shape
+    # Add slack variables for each flow fᵤᵥ
+    # to encode 0 ≤ fᵤᵥ ≤ 1 in standard form
+
+    # Pad A with extra columns for all the slack variables we need to add
+    A = np.hstack((A, np.zeros((num_vertices, num_edges))))
+    for e_idx in range(num_edges):
+        row = np.zeros((1, num_edges * 2))
+        row[0, e_idx] = 1
+        row[0, num_edges + e_idx] = 1
+        A = np.vstack((A, row))
+        b = np.concatenate((b, [1]))
+
+    # Add the constraint that sum incoming flows <= 1 for each vertex
+    num_slacks = num_vertices
+    A = np.hstack((A, np.zeros((A.shape[0], num_slacks))))
+    edges = list(G.edges())
+    for idx, vertex in enumerate(G.nodes()):
+        incoming_edges = list(G.in_edges(vertex))
+        constraint_row = np.zeros((1, A.shape[1]))
+        # add the corresponding slack variable
+        constraint_row[0, num_edges * 2 + idx] = 1
+        b_row = 1
+        for e in incoming_edges:
+            e_idx = edges.index(e)
+            constraint_row[0, e_idx] = 1
+
+        if vertex == source:
+            b_row -= 1
+
+        A = np.vstack((A, constraint_row))
+        b = np.concatenate((b, [b_row]))
+
+    # Remove linearly independent rows in A
+    sym_mat = sympy.Matrix(A.T)
+    inds = list(sym_mat.rref()[1])
+
+    A = A[inds, :]
+    b = b[inds]
 
     return A, b
 
